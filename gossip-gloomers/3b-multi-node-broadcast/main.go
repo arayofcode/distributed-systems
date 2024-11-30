@@ -11,9 +11,9 @@ import (
 type Topology map[string][]string
 
 type NodeStruct struct {
-	node         *maelstrom.Node
-	messageStore sync.Map
-	topology     *Topology
+	Node         *maelstrom.Node
+	MessageStore sync.Map
+	Topology     *Topology
 }
 
 type Request struct {
@@ -31,7 +31,7 @@ func main() {
 	n := maelstrom.NewNode()
 
 	nodeData := NodeStruct{
-		node: n,
+		Node: n,
 	}
 
 	n.Handle("broadcast", nodeData.handleBroadcast)
@@ -49,30 +49,36 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 		panic(err)
 	}
 
-	if _, exists := data.messageStore.LoadOrStore(*request.Message, struct{}{}); exists {
+	if _, exists := data.MessageStore.LoadOrStore(*request.Message, struct{}{}); exists || request.Message == nil {
 		return nil
 	}
 
-	for _, node := range data.node.NodeIDs() {
-		data.node.Send(node, msg.Body)
+	if data.Topology != nil {
+		for _, node := range (*data.Topology)[data.Node.ID()] {
+			go data.Node.Send(node, msg.Body)
+		}
+	} else {
+		for _, node := range data.Node.NodeIDs() {
+			go data.Node.Send(node, msg.Body)
+		}
 	}
 
-	return data.node.Reply(msg, Response{
+	return data.Node.Reply(msg, Response{
 		Type: "broadcast_ok",
 	})
 }
 
 func (data *NodeStruct) handleRead(msg maelstrom.Message) error {
 	var response = Response{
-		Type: "read_ok",
+		Type:     "read_ok",
 		Messages: new([]int),
 	}
-	data.messageStore.Range(func(key, value any) bool {
+	data.MessageStore.Range(func(key, value any) bool {
 		*response.Messages = append(*response.Messages, key.(int))
 		return true
 	})
 
-	return data.node.Reply(msg, response)
+	return data.Node.Reply(msg, response)
 }
 
 func (data *NodeStruct) handleTopology(msg maelstrom.Message) error {
@@ -82,9 +88,9 @@ func (data *NodeStruct) handleTopology(msg maelstrom.Message) error {
 		panic(err)
 	}
 
-	data.topology = request.Topology
+	data.Topology = request.Topology
 
-	return data.node.Reply(msg, Response{
+	return data.Node.Reply(msg, Response{
 		Type: "topology_ok",
 	})
 }

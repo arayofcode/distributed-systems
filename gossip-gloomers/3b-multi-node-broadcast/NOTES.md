@@ -6,7 +6,6 @@
   - Create a new RPC for handling such responses?
 
 ## Implementation and corner cases
-- Broadcasting with topology not implemented yet.
 - Store the messages in an array or map, and use mutexs to avoid race conditions for both read and writes.
   - I used `sync.Map` which seemed to be good for given usecase, given a map could also prevent addition of duplicate entries.
 - For broadcasting, add append to list of messages, then send the body received in maelstrom message to all nodes. 
