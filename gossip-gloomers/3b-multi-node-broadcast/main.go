@@ -16,6 +16,17 @@ type NodeStruct struct {
 	topology     *Topology
 }
 
+type Request struct {
+	Type     string    `json:"type"`
+	Message  *int      `json:"message,omitempty"`
+	Topology *Topology `json:"topology,omitempty"`
+}
+
+type Response struct {
+	Type     string `json:"type"`
+	Messages *[]int `json:"messages,omitempty"`
+}
+
 func main() {
 	n := maelstrom.NewNode()
 
@@ -33,52 +44,47 @@ func main() {
 }
 
 func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
-	request := make(map[string]any)
+	var request Request
 	if err := json.Unmarshal(msg.Body, &request); err != nil {
 		panic(err)
 	}
 
-	message := int(request["message"].(float64))
-
-	if _, exists := data.messageStore.LoadOrStore(message, struct{}{}); exists {
+	if _, exists := data.messageStore.LoadOrStore(*request.Message, struct{}{}); exists {
 		return nil
 	}
 
 	for _, node := range data.node.NodeIDs() {
-		data.node.Send(node, request)
+		data.node.Send(node, msg.Body)
 	}
 
-	return data.node.Reply(msg, map[string]string{
-		"type": "broadcast_ok",
+	return data.node.Reply(msg, Response{
+		Type: "broadcast_ok",
 	})
 }
 
 func (data *NodeStruct) handleRead(msg maelstrom.Message) error {
-	messages := []int{}
+	var response = Response{
+		Type: "read_ok",
+		Messages: new([]int),
+	}
 	data.messageStore.Range(func(key, value any) bool {
-		messages = append(messages, key.(int))
+		*response.Messages = append(*response.Messages, key.(int))
 		return true
 	})
 
-	return data.node.Reply(msg, map[string]any{
-		"type":     "read_ok",
-		"messages": messages,
-	})
+	return data.node.Reply(msg, response)
 }
 
 func (data *NodeStruct) handleTopology(msg maelstrom.Message) error {
-	request := struct {
-		Type     string   `json:"type"`
-		Topology Topology `json:"topology"`
-	}{}
+	var request Request
 
 	if err := json.Unmarshal(msg.Body, &request); err != nil {
 		panic(err)
 	}
 
-	data.topology = &request.Topology
+	data.topology = request.Topology
 
-	return data.node.Reply(msg, map[string]any{
-		"type": "topology_ok",
+	return data.node.Reply(msg, Response{
+		Type: "topology_ok",
 	})
 }
