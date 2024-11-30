@@ -55,10 +55,16 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 
 	if data.Topology != nil {
 		for _, node := range (*data.Topology)[data.Node.ID()] {
+			if node == msg.Src || node == data.Node.ID() {
+				continue
+			}
 			go data.Node.Send(node, msg.Body)
 		}
 	} else {
 		for _, node := range data.Node.NodeIDs() {
+			if node == msg.Src || node == data.Node.ID() {
+				continue
+			}
 			go data.Node.Send(node, msg.Body)
 		}
 	}
