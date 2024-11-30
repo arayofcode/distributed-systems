@@ -1,5 +1,5 @@
 # Notes and Challenges
 
-The existing code was pretty good to start with. Had to find a way to wait until the network partition recovered. [Read about waitgroups](https://gobyexample.com/waitgroups) and implemented a very basic version. It worked!
+Okay I messed this one up. Didn't setup my bash script correctly, which showed me everything worked. SMH.
 
-I honestly have no idea of the best practices around waitgroups so can't improve this code much for now. 
+The approach should be to send a message. If it didn't go, retry after an interval until the network partition recovers. 
