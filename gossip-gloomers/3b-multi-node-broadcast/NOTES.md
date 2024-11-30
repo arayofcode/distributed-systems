@@ -7,6 +7,10 @@
 
 ## Implementation and corner cases
 - Store the messages in an array or map, and use mutexs to avoid race conditions for both read and writes.
-  - I used `sync.Map` which seemed to be good for given usecase, given a map could also prevent addition of duplicate entries.
-- For broadcasting, add append to list of messages, then send the body received in maelstrom message to all nodes. 
-- Corner cases: Sending message to another node leads to an infinite loop where that node will keep sending the message to all other nodes. Fix it by returning nil if the message is already present.
+  - I used `sync.Map` which seemed to be good for given usecase of avoiding duplicates and handling mutexes.
+- For broadcasting, append to list of messages, then send the body received in maelstrom message to all nodes. 
+- While broadcasting, read kept showing `broadcast 0` too many times. This happened because node `a` broadcasted to `b` and `b` sent the same message back to `a`, and so on. 
+  - Fix is to not send message to message source, or the current node.
+- Sending message kept showing no handler error. This is because when broadcasting with Send, the other node replied but the current node didn’t handle it. 
+  - A way around was to use node.RPC, and create empty handler function.
+  - Another is to check if a message has msg_id. If it doesn't, this one doesn't need a reply. return nil instead of `Reply()` in such cases.
