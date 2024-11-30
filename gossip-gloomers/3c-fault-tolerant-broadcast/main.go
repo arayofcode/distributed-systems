@@ -65,10 +65,10 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 			continue
 		}
 		wg.Add(1)
-		go func() {
+		go func(nodeId string) {
 			defer wg.Done()
-			data.Node.Send(node, msg.Body)
-		}()
+			data.Node.Send(nodeId, msg.Body)
+		}(node)
 	}
 
 	wg.Wait()
