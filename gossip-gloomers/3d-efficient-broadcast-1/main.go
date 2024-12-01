@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"sync"
@@ -67,7 +68,8 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 		wg.Add(1)
 		go func(nodeId string) {
 			defer wg.Done()
-			data.Node.Send(nodeId, msg.Body)
+			ctx := context.Background()
+			data.Node.SyncRPC(ctx, nodeId, msg.Body)
 		}(node)
 	}
 

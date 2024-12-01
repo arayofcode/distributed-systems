@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	maelstrom "github.com/jepsen-io/maelstrom/demo/go"
 )
@@ -58,20 +60,21 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 		nodes = (*data.Topology)[data.Node.ID()]
 	}
 
-	var wg sync.WaitGroup
-
 	for _, node := range nodes {
 		if node == msg.Src || node == data.Node.ID() {
 			continue
 		}
-		wg.Add(1)
 		go func(nodeId string) {
-			defer wg.Done()
-			data.Node.Send(nodeId, msg.Body)
+			ctx := context.Background()
+			if _, err := data.Node.SyncRPC(ctx, nodeId, msg.Body); err != nil {
+				for k := 1; err != nil; k++ {
+					time.Sleep(time.Duration(k) * time.Second)
+					_, err = data.Node.SyncRPC(ctx, nodeId, msg.Body)
+				}
+				return
+			}
 		}(node)
 	}
-
-	wg.Wait()
 
 	return data.Node.Reply(msg, Response{
 		Type: "broadcast_ok",
