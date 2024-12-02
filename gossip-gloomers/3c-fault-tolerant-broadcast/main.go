@@ -60,21 +60,47 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 		nodes = (*data.Topology)[data.Node.ID()]
 	}
 
+	var wg sync.WaitGroup
+
+	var unsentMessages sync.Map
 	for _, node := range nodes {
 		if node == msg.Src || node == data.Node.ID() {
 			continue
 		}
-		go func(nodeId string) {
-			ctx := context.Background()
-			if _, err := data.Node.SyncRPC(ctx, nodeId, msg.Body); err != nil {
-				for k := 1; err != nil; k++ {
-					time.Sleep(time.Duration(k) * time.Second)
-					_, err = data.Node.SyncRPC(ctx, nodeId, msg.Body)
-				}
-				return
-			}
-		}(node)
+		unsentMessages.Store(node, struct{}{})
 	}
+
+	go func() {
+		retries := 5
+		for retries != 0 {
+			unsentMessages.Range(func(key, _ any) bool {
+				wg.Add(1)
+				node := key.(string)
+				go func(nodeId string) {
+					defer wg.Done()
+					ctx := context.Background()
+					msg, _ := data.Node.SyncRPC(ctx, nodeId, msg.Body)
+					var response Response
+					json.Unmarshal(msg.Body, &response)
+					if response.Type == "broadcast_ok" {
+						unsentMessages.Delete(nodeId)
+					}
+				}(node)
+				return true
+			})
+
+			empty := true
+			unsentMessages.Range(func(key, _ any) bool {
+				empty = false
+				return false
+			})
+
+			if !empty {
+				time.Sleep(time.Second)
+			}
+		}
+		wg.Wait()
+	}()
 
 	return data.Node.Reply(msg, Response{
 		Type: "broadcast_ok",
