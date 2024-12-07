@@ -15,4 +15,10 @@ Worker -> Fetch job through the channel, and send it infinitely until there's no
 
 ## Goroutine for each unsent message with explicit retry mechanism
 
-Maintain a list of nodes where you didn't receive `broadcast_ok`. Until this list isn't empty, for each unsent node, create a new goroutine, send this message. If received `broadcast_ok`, remove this node from the list else continue trying.
+- Maintain a list of nodes where you didn't receive `broadcast_ok`. Until this list isn't empty, for each unsent node, create a new goroutine, send this message. If received `broadcast_ok`, remove this node from the list else continue trying.
+
+## Retry Mechanism
+
+- For each message to send, setup a retry mechanism in a separate goroutine.
+  - For max r retries, send RPC to relevant nodes. 
+  - If message sent, return else sleep for ten seconds.

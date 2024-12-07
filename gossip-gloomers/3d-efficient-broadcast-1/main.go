@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	maelstrom "github.com/jepsen-io/maelstrom/demo/go"
 )
@@ -59,21 +59,12 @@ func (data *NodeStruct) handleBroadcast(msg maelstrom.Message) error {
 		nodes = (*data.Topology)[data.Node.ID()]
 	}
 
-	var wg sync.WaitGroup
-
 	for _, node := range nodes {
 		if node == msg.Src || node == data.Node.ID() {
 			continue
 		}
-		wg.Add(1)
-		go func(nodeId string) {
-			defer wg.Done()
-			ctx := context.Background()
-			data.Node.SyncRPC(ctx, nodeId, msg.Body)
-		}(node)
+		go sendToNode(data.Node, node, msg.Body)
 	}
-
-	wg.Wait()
 
 	return data.Node.Reply(msg, Response{
 		Type: "broadcast_ok",
@@ -105,4 +96,27 @@ func (data *NodeStruct) handleTopology(msg maelstrom.Message) error {
 	return data.Node.Reply(msg, Response{
 		Type: "topology_ok",
 	})
+}
+
+func sendToNode(node *maelstrom.Node, destination string, msg any) {
+	sent := false
+	retry := 5
+	for retry > 0 {
+		node.RPC(destination, msg, func(msg maelstrom.Message) error {
+			var rpcResponse Response
+			if err := json.Unmarshal(msg.Body, &rpcResponse); err != nil {
+				panic(err)
+			}
+			if rpcResponse.Type == "broadcast_ok" {
+				sent = true
+			}
+			return nil
+		})
+
+		if sent {
+			return
+		}
+		retry--
+		time.Sleep(time.Second * 5)
+	}
 }
